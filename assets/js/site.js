@@ -491,37 +491,67 @@
     }, '0px 0px -10% 0px', 0.2);
   });
 
-  /* ── consistency: the three cards fan out, the ticks draw together ── */
+  /* ── why families switch: five reasons, one card per scroll step on a pinned stage (a fan on desktop, a stack on
+     phones). Reduced motion keeps the static grid, so nothing here runs. ── */
   var deck = $('[data-deck]');
-  if (deck) onceVisible(deck, function () { deck.classList.add('is-on'); }, '0px 0px -25% 0px');
-  /* phones: the cards arrive one at a time with the scroll (visit 1, then 10, then 50) on a sticky stage */
+  var why = deck ? deck.closest('.why') : null;
   var deckCards = deck ? $$('.card', deck) : [];
   var deckStage = deck ? $('.deck__stage', deck) : null;
+  var deckBtns = deck ? $$('[data-step]', deck) : [];
+  var deckN = deckCards.length;
   var deckTick = false;
-  function deckStep() {
-    if (!deck || !deck.classList.contains('deck--seq')) return;
+  function deckGeo() {
     var r = deck.getBoundingClientRect();
     var top = parseFloat(getComputedStyle(deckStage).top) || 0;
-    var p = clamp((top - r.top) / Math.max(1, r.height - deckStage.offsetHeight), 0, 1);
-    var k = Math.min(2, Math.floor(p * 3));
-    if (deck.getAttribute('data-k') !== String(k)) deck.setAttribute('data-k', String(k));
-    var seen = r.top < window.innerHeight * 0.75;
+    return { r: r, top: top, span: Math.max(1, r.height - deckStage.offsetHeight) };
+  }
+  function deckSet(k) {
+    deck.setAttribute('data-k', String(k));
+    deckCards.forEach(function (c, i) {
+      var d = i - k;
+      c.style.setProperty('--d', d);
+      c.style.setProperty('--dc', Math.max(-2, Math.min(2, d)));
+      c.style.setProperty('--ad', Math.min(2, Math.abs(d)));
+      c.setAttribute('data-pos', d < 0 ? 'past' : (d === 0 ? 'now' : 'next'));
+      c.classList.toggle('is-far', Math.abs(d) > 2);
+    });
+    deckBtns.forEach(function (btn, i) {
+      if (i === k) btn.setAttribute('aria-current', 'step'); else btn.removeAttribute('aria-current');
+    });
+  }
+  function deckStep() {
+    if (!why || !why.classList.contains('is-seq')) return;
+    var g = deckGeo();
+    var p = clamp((g.top - g.r.top) / g.span, 0, 1);
+    var k = Math.min(deckN - 1, Math.floor(p * deckN));
+    if (deck.getAttribute('data-k') !== String(k)) deckSet(k);
+    var seen = g.r.top < window.innerHeight * 0.75;
     deckCards.forEach(function (c, i) { c.classList.toggle('is-shown', seen && i <= k); });
   }
-  function deckMode() {
-    if (!deck) return;
-    var on = mqMobile.matches && !reduce;
-    deck.classList.toggle('deck--seq', on);
-    if (on) deckStep(); else { deck.removeAttribute('data-k'); deckCards.forEach(function (c) { c.classList.add('is-shown'); }); }
-  }
-  if (deck) {
-    deckMode();
-    if (mqMobile.addEventListener) mqMobile.addEventListener('change', deckMode);
-    window.addEventListener('scroll', function () {
-      if (deckTick) return;
-      deckTick = true;
-      requestAnimationFrame(function () { deckTick = false; deckStep(); });
-    }, { passive: true });
+  if (deck && deckStage && deckN) {
+    if (!reduce) {
+      why.classList.add('is-seq');
+      onceVisible(deck, function () { deck.classList.add('is-on'); }, '0px 0px -25% 0px');
+      deckSet(0);
+      deckStep();
+      window.addEventListener('scroll', function () {
+        if (deckTick) return;
+        deckTick = true;
+        requestAnimationFrame(function () { deckTick = false; deckStep(); });
+      }, { passive: true });
+      window.addEventListener('resize', deckStep);
+      /* the indicator jumps to the middle of that card's scroll step */
+      deckBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var i = parseInt(btn.getAttribute('data-step'), 10) || 0;
+          var g = deckGeo();
+          var y = window.pageYOffset + g.r.top - g.top + g.span * (i + 0.5) / deckN;
+          window.scrollTo({ top: Math.round(y), behavior: 'smooth' });
+        });
+      });
+    } else {
+      deckCards.forEach(function (c) { c.classList.add('is-shown'); });
+    }
   }
 
   /* ── trust: the clock hand walks through the visit; the light of the chapter warms with the scroll ── */
