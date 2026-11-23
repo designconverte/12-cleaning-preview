@@ -68,7 +68,7 @@ button { cursor: pointer; }
 .hdr.is-hidden { transform: translateY(-100%); }
 .hdr__in { height: 100%; display: flex; align-items: center; gap: 28px; max-width: calc(var(--wrap) + var(--gut) * 2); margin-inline: auto; padding-inline: var(--gut); }
 .hdr__logo { flex: none; }
-.hdr__logo img { width: 132px; height: auto; }
+.hdr__logo img { width: 148px; height: auto; }
 .hdr__nav { margin-left: auto; }
 .hdr__nav > ul { display: flex; gap: 26px; }
 .hdr__nav a { color: var(--tw-ink); text-decoration: none; font-weight: 500; font-size: .9688rem; padding: 6px 0; background: linear-gradient(var(--tw-gold), var(--tw-gold)) 0 100% / 0 1px no-repeat; transition: background-size var(--tw-d-2) var(--tw-ease); }
@@ -83,7 +83,7 @@ button { cursor: pointer; }
 .smenu:not([hidden]) { animation: menuIn var(--tw-d-3) var(--tw-ease); }
 @keyframes menuIn { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
 .smenu__top { display: flex; align-items: center; justify-content: space-between; min-height: 56px; }
-.smenu__top img { width: 116px; height: auto; }
+.smenu__top img { width: 128px; height: auto; }
 .smenu__close { width: 48px; height: 48px; border: 1px solid var(--tw-line); border-radius: 12px; background: var(--tw-white); display: grid; place-items: center; }
 .smenu__nav { margin-top: 28px; }
 .smenu__nav li + li { border-top: 1px solid var(--tw-line); }
@@ -542,7 +542,7 @@ textarea.input { min-height: 84px; resize: vertical; }
 }
 @media (max-width: 1023px) {
   :root { --hdr-h: 72px; }
-  .hdr__logo img { width: 112px; }
+  .hdr__logo img { width: 128px; }
   .hdr__tel span { display: none; }
   .hdr__tel { width: 44px; height: 44px; justify-content: center; border: 1px solid var(--tw-line); border-radius: 12px; background: var(--tw-white); }
   .hero__grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
@@ -571,7 +571,7 @@ textarea.input { min-height: 84px; resize: vertical; }
 @media (max-width: 699px) {
   :root { --hdr-h: 64px; }
   body { font-size: 1rem; }
-  .hdr__logo img { width: 96px; }
+  .hdr__logo img { width: 112px; }
   .hdr__cta { display: none; }
   .hero { padding-top: calc(var(--hdr-h) + 10px); }
   .hero__h1 { margin-top: 10px; }
