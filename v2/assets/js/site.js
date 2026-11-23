@@ -74,7 +74,7 @@
       if (quiet) { stage.introPending = !reduce; stage.draw(); } else stage.intro();
     } catch (_e) { stage = null; }
   }
-  var deskDrawer = function () { return window.matchMedia('(min-width: 1024px)').matches && !!$('[data-stage]') && !!$('[data-qcard]'); };
+  var deskDrawer = function () { return !!$('[data-stage]') && !!$('[data-qcard]'); };
   var startIfStacked = function () {
     if (!deskDrawer()) { startStage(); return; }
     var idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 600); };
@@ -366,7 +366,7 @@
       zipMode();
       var hh = parseInt(getComputedStyle(doc).getPropertyValue('--hdr-h'), 10) || 64;
       var r = form.getBoundingClientRect();
-      if (r.top < hh || r.top > window.innerHeight * 0.45) window.scrollTo({ top: window.scrollY + r.top - hh - 12, behavior: reduce ? 'auto' : 'smooth' });
+      if (!doc.classList.contains('drawer-open') && (r.top < hh || r.top > window.innerHeight * 0.45)) window.scrollTo({ top: window.scrollY + r.top - hh - 12, behavior: reduce ? 'auto' : 'smooth' });
       var first = form.querySelector('[name="service"]:checked') || form.querySelector('[name="service"]');
       if (first) first.focus({ preventScroll: true });
     }
@@ -649,7 +649,7 @@
     if (!heroHome) { window.location.href = '/#estimate'; return; }
     selectTab(opts.business ? 'business' : 'home');
     var form = opts.business ? heroBiz : heroHome;
-    var target = isDesktop() ? 0 : Math.max(0, ($('[data-stage]') || form).getBoundingClientRect().top + window.scrollY - (parseInt(getComputedStyle(doc).getPropertyValue('--hdr-h'), 10) || 64) - 8);
+    var target = isDesktop() ? 0 : Math.max(0, ($('[data-qcard]') || form).getBoundingClientRect().top + window.scrollY - (parseInt(getComputedStyle(doc).getPropertyValue('--hdr-h'), 10) || 64) - 8);
     scrollToY(target);
     var onStep1 = !$('[data-cs-step="1"]', form).hidden;
     var wait = reduce ? 0 : Math.min(1200, 250 + window.scrollY / 5);
@@ -701,11 +701,40 @@
   }
 
 
-  /* ═════ desktop: the illustration drawer ═════
-     The hero rests as text + form. Starting the form (tile, ZIP, tabs, any field) slides the house in from the left;
-     scrolling away from the form, Esc, a click on the veil, focus leaving the form or the close button slide it out.
-     The house keeps its state between openings. Focus is never trapped: the form stays usable in front. */
+  /* ═════ the illustration drawer ═════
+     The hero rests as text + form. Starting the form (tile, ZIP, tabs, any field) slides the house in: from the left
+     on desktop, down from the top on phones. Scrolling away from the form, Esc, a click on the veil, focus leaving the
+     form or the close button slide it out. The house keeps its state between openings. Focus is never trapped.
+     Phones: the drawer is sized to the visual viewport, so it turns into a compact strip while the keyboard is up, and
+     the field being edited (with its Next button) is kept in the band between the drawer and the keyboard. */
   var mqDesk = window.matchMedia('(min-width: 1024px)');
+  var vv = window.visualViewport || null;
+  var mdh = 0;
+  function mobileSize() {
+    if (mqDesk.matches) return;
+    var h = vv ? vv.height : window.innerHeight;
+    var kb = h < window.innerHeight * 0.78;
+    doc.classList.toggle('kb-open', kb);
+    mdh = kb ? Math.round(clamp(h * 0.3, 104, 168)) : Math.round(clamp(h * 0.4, 220, 360));
+    doc.style.setProperty('--mdh', mdh + 'px');
+    doc.style.setProperty('--vv-top', (vv ? Math.round(vv.offsetTop) : 0) + 'px');
+  }
+  function keepInView(el) {
+    if (!drawerOpen || mqDesk.matches || !el || !heroCard.contains(el)) return;
+    var row = el.closest('.qinline') || el.closest('.field') || el.closest('.tile') || el.closest('.count') || el;
+    var r = row.getBoundingClientRect();
+    var top = (vv ? vv.offsetTop : 0) + mdh + 10;
+    var bottom = (vv ? vv.offsetTop + vv.height : window.innerHeight) - 10;
+    var dy = 0;
+    /* first choice: the whole card starts right under the drawer, if the edited row still fits above the keyboard */
+    var card = heroCard.getBoundingClientRect();
+    if (r.bottom - (card.top - top) <= bottom && r.top - (card.top - top) >= top) dy = card.top - top;
+    else if (r.top < top) dy = r.top - top;
+    else if (r.bottom > bottom) dy = Math.min(r.bottom - bottom, r.top - top);
+    if (Math.abs(dy) < 2) return;
+    hushUntil = Date.now() + 700;
+    window.scrollBy({ top: dy, behavior: reduce ? 'auto' : 'smooth' });
+  }
   var stageFig = $('[data-stage]');
   var heroCard = $('[data-qcard]');
   var drawerOn = false, drawerOpen = false, hushUntil = 0, quietUntil = 0, blurProbed = false;
@@ -717,9 +746,9 @@
     doc.style.setProperty('--drawer-w', Math.max(320, Math.round(w)) + 'px');
   }
   function activeTab() { var t = $('[data-tab][aria-selected="true"]'); return t ? t.getAttribute('data-tab') : 'home'; }
-  function openDrawer() {
+  function openDrawer(e) {
     if (!drawerOn || drawerOpen || Date.now() < quietUntil) return;
-    drawerWidth();
+    if (mqDesk.matches) drawerWidth(); else mobileSize();
     drawerOpen = true;
     doc.classList.add('drawer-open');
     /* blur budget: the first slide is timed; below ~40 fps the veil drops the blur for a solid tint */
@@ -743,6 +772,8 @@
       /* the house builds once the slide has landed, so the two motions never compete for the same frames */
       setTimeout(function () { if (stage) stage.intro(); }, reduce ? 0 : 640);
     } else if (stage) stage.resize();
+    var focusEl = (e && e.target && heroCard.contains(e.target)) ? e.target : document.activeElement;
+    if (!mqDesk.matches) { setTimeout(function () { keepInView(focusEl); }, reduce ? 0 : 80); }
   }
   function closeDrawer() {
     if (!drawerOpen) return;
@@ -750,9 +781,10 @@
     doc.classList.remove('drawer-open');
   }
   function drawerMode() {
-    drawerOn = mqDesk.matches && !!stageFig && !!heroCard;
+    drawerOn = !!stageFig && !!heroCard;
     doc.classList.toggle('drawer-mode', drawerOn);
-    if (!drawerOn) { closeDrawer(); if (!stage) startStage(); }
+    if (!drawerOn) { closeDrawer(); if (!stage) startStage(); return; }
+    if (drawerOpen) { if (mqDesk.matches) drawerWidth(); else mobileSize(); }
   }
   if (stageFig && heroCard) {
     veil = document.createElement('div');
@@ -781,10 +813,24 @@
     window.addEventListener('scroll', function () {
       if (!drawerOpen || Date.now() < hushUntil) return;
       var r = heroCard.getBoundingClientRect();
-      var hh = parseInt(getComputedStyle(doc).getPropertyValue('--hdr-h'), 10) || 84;
-      if (r.bottom < hh + 160 || r.top > window.innerHeight - 120) closeDrawer();
+      if (mqDesk.matches) {
+        var hh = parseInt(getComputedStyle(doc).getPropertyValue('--hdr-h'), 10) || 84;
+        if (r.bottom < hh + 160 || r.top > window.innerHeight - 120) closeDrawer();
+      } else {
+        var vh = vv ? vv.offsetTop + vv.height : window.innerHeight;
+        if (r.bottom < mdh + 60 || r.top > vh - 60) closeDrawer();
+      }
     }, { passive: true });
-    window.addEventListener('resize', function () { if (drawerOpen) drawerWidth(); });
+    window.addEventListener('resize', function () { if (drawerOpen) { if (mqDesk.matches) drawerWidth(); else mobileSize(); } });
+    /* phones: the keyboard shrinks the visual viewport; the drawer follows and the edited field stays in view */
+    var onViewport = function () {
+      if (!drawerOpen || mqDesk.matches) return;
+      mobileSize();
+      var a = document.activeElement;
+      if (a && heroCard.contains(a)) keepInView(a);
+    };
+    if (vv) { vv.addEventListener('resize', onViewport); vv.addEventListener('scroll', function () { if (drawerOpen && !mqDesk.matches) doc.style.setProperty('--vv-top', Math.round(vv.offsetTop) + 'px'); }); }
+    heroCard.addEventListener('focusin', function (e) { if (drawerOpen && !mqDesk.matches) setTimeout(function () { keepInView(e.target); }, 60); });
   }
 
 
