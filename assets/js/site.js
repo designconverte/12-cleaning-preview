@@ -833,6 +833,102 @@
     heroCard.addEventListener('focusin', function (e) { if (drawerOpen && !mqDesk.matches) setTimeout(function () { keepInView(e.target); }, 60); });
   }
 
+
+  /* ═════ V2: real work ═════ */
+
+  /* videos: poster first; the clip is fetched near the viewport, plays only on screen, pauses off it.
+     Reduced motion, Save-Data or a slow connection keep the poster. Every loop has a visible pause button. */
+  (function () {
+    var vids = $$('[data-vbg]');
+    if (!vids.length) return;
+    var conn = navigator.connection || {};
+    var still = reduce || conn.saveData === true || /(^|-)2g$/.test(conn.effectiveType || '');
+    if (still || !hasIO) return;
+    vids.forEach(function (box) {
+      var v = $('video', box);
+      var host = box.parentNode;
+      var btn = $('[data-vpause]', host);
+      var userPaused = false, onScreen = false;
+      var play = function () {
+        if (userPaused || !onScreen) return;
+        var pr = v.play();
+        if (pr && pr.catch) pr.catch(function () { /* autoplay refused: the poster stays */ });
+      };
+      v.addEventListener('playing', function () { box.classList.add('is-on'); });
+      if (btn) {
+        btn.hidden = false;
+        btn.addEventListener('click', function () {
+          userPaused = !userPaused;
+          btn.setAttribute('aria-pressed', String(userPaused));
+          var l = $('[data-vpause-label]', btn); if (l) l.textContent = userPaused ? 'Play video' : 'Pause video';
+          if (userPaused) v.pause(); else play();
+        });
+      }
+      new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          if (!e.isIntersecting || v.getAttribute('src')) return;
+          v.setAttribute('src', v.getAttribute('data-src'));
+          v.load();
+        });
+      }, { rootMargin: '400px 0px' }).observe(host);
+      new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          onScreen = e.isIntersecting;
+          if (onScreen) play(); else v.pause();
+        });
+      }, { threshold: 0.12 }).observe(host);
+    });
+  })();
+
+  /* before / after: a range input drives the line (keyboard and screen readers get the same control) */
+  $$('[data-ba]').forEach(function (frame) {
+    var range = $('[data-ba-range]', frame);
+    if (!range) return;
+    var set = function (v) { frame.style.setProperty('--ba', clamp(Number(v), 0, 100) + '%'); };
+    range.addEventListener('input', function () { set(range.value); });
+    set(range.value);
+  });
+
+  /* full-screen photos: arrows, keys, swipe; Esc or a click outside closes and focus returns to the photo */
+  (function () {
+    var shots = $$('[data-lb]');
+    if (!shots.length || typeof HTMLDialogElement === 'undefined') return;
+    var dlg = document.createElement('dialog');
+    dlg.className = 'lb';
+    dlg.setAttribute('aria-label', 'Photos from recent jobs');
+    var ic = function (id) { return '<svg class="ic" aria-hidden="true"><use href="' + ICONS + '#i-' + id + '"></use></svg>'; };
+    dlg.innerHTML = '<div class="lb__stage"><img class="lb__img" alt=""></div><div class="lb__bar"><p class="lb__cap"></p><p class="lb__count"></p></div>' +
+      '<button class="lb__btn lb__close" type="button" aria-label="Close photos">' + ic('close') + '</button>' +
+      '<button class="lb__btn lb__prev" type="button" aria-label="Previous photo">' + ic('arrow-left') + '</button>' +
+      '<button class="lb__btn lb__next" type="button" aria-label="Next photo">' + ic('arrow-right') + '</button>';
+    document.body.appendChild(dlg);
+    var img = $('.lb__img', dlg), cap = $('.lb__cap', dlg), count = $('.lb__count', dlg);
+    var cur = 0, opener = null;
+    var show = function (i) {
+      cur = (i + shots.length) % shots.length;
+      var s = shots[cur];
+      img.src = s.getAttribute('data-src');
+      var inner = $('img', s);
+      img.alt = inner ? inner.alt : '';
+      cap.textContent = s.getAttribute('data-cap') || '';
+      count.textContent = (cur + 1) + ' / ' + shots.length;
+    };
+    shots.forEach(function (b, i) { b.addEventListener('click', function () { opener = b; show(i); dlg.showModal(); }); });
+    $('.lb__close', dlg).addEventListener('click', function () { dlg.close(); });
+    $('.lb__prev', dlg).addEventListener('click', function () { show(cur - 1); });
+    $('.lb__next', dlg).addEventListener('click', function () { show(cur + 1); });
+    dlg.addEventListener('click', function (e) { if (e.target === dlg || e.target.classList.contains('lb__stage')) dlg.close(); });
+    dlg.addEventListener('keydown', function (e) { if (e.key === 'ArrowLeft') show(cur - 1); if (e.key === 'ArrowRight') show(cur + 1); });
+    dlg.addEventListener('close', function () { if (opener) opener.focus(); });
+    var sx = null;
+    dlg.addEventListener('pointerdown', function (e) { sx = e.clientX; });
+    dlg.addEventListener('pointerup', function (e) {
+      if (sx === null) return;
+      var d = e.clientX - sx; sx = null;
+      if (Math.abs(d) > 50) show(cur + (d < 0 ? 1 : -1));
+    });
+  })();
+
   /* ── mobile menu: focus trapped, Esc closes, focus returns to the button ── */
   var menu = $('[data-menu]');
   var toggle = $('[data-menu-toggle]');
@@ -872,5 +968,4 @@
     });
   }
 
-  void ICONS;
 })();
