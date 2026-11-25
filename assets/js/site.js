@@ -700,6 +700,10 @@
   $$('[data-business]').forEach(function (a) {
     a.addEventListener('click', function (e) { e.preventDefault(); goEstimate({ business: true }); });
   });
+  /* arriving from another page on /#estimate: the same move as the header button (the form, then the ZIP) */
+  if (heroHome && window.location.hash === '#estimate') {
+    window.addEventListener('load', function () { setTimeout(function () { goEstimate({}); }, 250); });
+  }
   $$('[data-go-estimate]').forEach(function (a) {
     a.addEventListener('click', function (e) {
       if (a.hasAttribute('data-menu-link')) return;
@@ -715,8 +719,9 @@
 
   /* ── mobile bar: after the hero form, hidden while the final form is on screen ── */
   var mbar = $('[data-mbar]');
-  var heroFormBox = $('[data-hero-form]');
-  var finalBox = $('[data-final-form]');
+  /* pages without the hero form (the founder profile) mark where the bar starts and where it steps aside */
+  var heroFormBox = $('[data-hero-form]') || $('[data-mbar-after]');
+  var finalBox = $('[data-final-form]') || $('[data-mbar-until]');
   if (mbar && heroFormBox && hasIO) {
     var pastHero = false, finalOn = false;
     var paint = function () { mbar.classList.toggle('is-on', pastHero && !finalOn); };
